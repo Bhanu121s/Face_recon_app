@@ -89,7 +89,7 @@ assets/
 ## 🔧 Configuration
 
 ### Similarity Threshold
-Adjust the face matching threshold in `camera_screen.dart` (line ~107):
+Adjust the face matching threshold in `camera_screen.dart` (line ~125):
 ```dart
 threshold: 0.75,  // Increase for stricter matching, decrease for lenient
 ```
