@@ -24,12 +24,6 @@ A real-time face recognition mobile application built with Flutter that detects,
 - **Storage**: SharedPreferences for persistent data
 - **Image Processing**: Dart `image` package
 
-## 📋 Prerequisites
-
-- Flutter 3.10.7 or higher
-- Android 21+ or iOS 11+
-- Camera permissions enabled
-
 ## 🚀 Installation
 
 1. **Clone the repository**
