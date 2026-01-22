@@ -35,14 +35,32 @@ class _CameraScreenState extends State<CameraScreen> {
   List<double>? _lastEmbedding;
   String _recognizedName = 'Unknown';
   Map<int, String> _faceNames = {}; // Maps face index to recognized name
+  Map<int, List<String>> _recentMatches = {}; // Stores recent matches for smoothing
+  static const int _smoothingFrames = 3; // Number of frames to smooth over
+  static const double _minFaceSize = 100.0; // Minimum face width in pixels
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
-    _loadModel();
-    _loadSavedFaces();
     _initializeFaceDetector();
+    _initializeAppWithData();
+  }
+
+  Future<void> _initializeAppWithData() async {
+    debugPrint('🚀 Initializing app...');
+    // Load model first
+    await _loadModel();
+    debugPrint('✅ Model loaded');
+    
+    // Load saved faces before camera starts
+    await _loadSavedFaces();
+    debugPrint('✅ Saved faces loaded: ${FaceDatabase.faces.length} people');
+    
+    // Finally, start camera
+    if (mounted) {
+      await _initializeCamera();
+      debugPrint('✅ Camera initialized');
+    }
   }
 
   void _initializeFaceDetector() {
@@ -57,14 +75,66 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
+  // Check if face is large enough and good quality
+  bool _isFaceQuality(Face face, Size imageSize) {
+    final faceWidth = face.boundingBox.width;
+    final minWidth = _minFaceSize;
+    
+    // Face must be large enough
+    if (faceWidth < minWidth) {
+      debugPrint('⚠️ Face too small: ${faceWidth.toStringAsFixed(1)}px (min: $minWidth)');
+      return false;
+    }
+    
+    return true;
+  }
+
+  // Get smoothed recognition result from recent matches
+  String _getSmoothedResult(int faceIndex, String currentMatch) {
+    if (!_recentMatches.containsKey(faceIndex)) {
+      _recentMatches[faceIndex] = [];
+    }
+    
+    final matches = _recentMatches[faceIndex]!;
+    matches.add(currentMatch);
+    
+    // Keep only recent matches
+    if (matches.length > _smoothingFrames) {
+      matches.removeAt(0);
+    }
+    
+    // Return most common match
+    final counts = <String, int>{};
+    for (final match in matches) {
+      counts[match] = (counts[match] ?? 0) + 1;
+    }
+    
+    return counts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+  }
+
   Future<void> _loadModel() async {
     await _embeddingService.loadModel();
   }
 
   Future<void> _loadSavedFaces() async {
-    final savedFaces = await FaceStorageService.getAllFaces();
-    for (final entry in savedFaces.entries) {
-      FaceDatabase.registerFace(entry.key, entry.value);
+    try {
+      final savedFaces = await FaceStorageService.getAllFaces();
+      debugPrint('📁 Retrieved ${savedFaces.length} people from storage');
+      
+      int totalEmbeddings = 0;
+      for (final entry in savedFaces.entries) {
+        debugPrint('   Loading "${entry.key}": ${entry.value.length} embeddings');
+        for (final embedding in entry.value) {
+          FaceDatabase.registerFace(entry.key, embedding);
+          totalEmbeddings++;
+        }
+      }
+      
+      debugPrint('✅ Loaded $totalEmbeddings total embeddings into FaceDatabase');
+      debugPrint('   FaceDatabase now contains: ${FaceDatabase.faces}');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading faces: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 
@@ -111,30 +181,41 @@ class _CameraScreenState extends State<CameraScreen> {
         if (faces.isNotEmpty && _embeddingService.isLoaded) {
           try {
             final img.Image rgbImage = _convertCameraImageToRGB(image);
+            final Size imageSize = Size(rgbImage.width.toDouble(), rgbImage.height.toDouble());
             Map<int, String> newFaceNames = {};
 
-            // Process each face in the frame
-            for (int i = 0; i < faces.length; i++) {
-              final Face face = faces[i];
-              final img.Image cropped = _cropFaceFromRGB(rgbImage, face);
-              final List<double> embedding = _embeddingService.getEmbedding(cropped);
+            // Only process largest face for more stable recognition
+            if (faces.isNotEmpty) {
+              final Face largestFace = _getLargestFace(faces);
+              
+              // Check face quality
+              if (_isFaceQuality(largestFace, imageSize)) {
+                final img.Image cropped = _cropFaceFromRGB(rgbImage, largestFace);
+                final List<double>? embedding = _embeddingService.getEmbedding(cropped);
 
-              final match = FaceMatcher.findBestMatch(
-                embedding: embedding,
-                database: FaceDatabase.faces,
-                threshold: 0.75,
-              );
+                if (embedding != null && embedding.isNotEmpty) {
+                  _lastEmbedding = embedding;
 
-              newFaceNames[i] = match ?? 'Unknown';
+                  final match = FaceMatcher.findBestMatch(
+                    embedding: embedding,
+                    database: FaceDatabase.faces,
+                    threshold: 0.72,
+                  );
 
-              // Keep track of last embedding for largest face
-              if (i == 0) {
-                _lastEmbedding = embedding;
-                _recognizedName = newFaceNames[i]!;
+                  // Apply smoothing for stable results
+                  final smoothedResult = _getSmoothedResult(0, match ?? 'Unknown');
+                  newFaceNames[0] = smoothedResult;
+                  _recognizedName = smoothedResult;
+
+                  debugPrint('✅ Match: $smoothedResult');
+                } else {
+                  debugPrint('❌ Failed to generate embedding');
+                  newFaceNames[0] = 'Unknown';
+                }
+              } else {
+                newFaceNames[0] = 'Unknown';
               }
             }
-
-            debugPrint('✅ Detected ${faces.length} face(s): $newFaceNames');
 
             if (mounted) {
               setState(() {
@@ -155,9 +236,10 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _isCameraInitialized = true;
     });
-  }
 
-  // ---------------- FACE REGISTRATION (STEP 1) ----------------
+    // Log initialization completion
+    debugPrint('🎥 Camera stream started and ready for face detection');
+  }
 
   void _showRegisterDialog() {
     if (_lastEmbedding == null) return;
@@ -168,10 +250,26 @@ class _CameraScreenState extends State<CameraScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Register Face'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Enter name',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'Enter name',
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '💡 Tip: For best accuracy, register the same face from:\n'
+                '• Different lighting conditions\n'
+                '• Different angles (front, left, right)\n'
+                '• Different distances from camera\n\n'
+                'This helps the system recognize you reliably.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -198,7 +296,10 @@ class _CameraScreenState extends State<CameraScreen> {
                 if (mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Face registered: $name')),
+                    SnackBar(
+                      content: Text('Face registered: $name\n✅ Register from different angles for better accuracy'),
+                      duration: const Duration(seconds: 3),
+                    ),
                   );
                 }
               }
@@ -275,11 +376,16 @@ class _CameraScreenState extends State<CameraScreen> {
 
   img.Image _cropFaceFromRGB(img.Image rgbImage, Face face) {
     final rect = face.boundingBox;
+    
+    // Add 20% padding around face for better feature capture
+    final padding = 0.2;
+    final paddedWidth = rect.width * padding;
+    final paddedHeight = rect.height * padding;
 
-    final x = rect.left.toInt().clamp(0, rgbImage.width - 1);
-    final y = rect.top.toInt().clamp(0, rgbImage.height - 1);
-    final w = rect.width.toInt().clamp(1, rgbImage.width - x);
-    final h = rect.height.toInt().clamp(1, rgbImage.height - y);
+    final x = (rect.left - paddedWidth).toInt().clamp(0, rgbImage.width - 1);
+    final y = (rect.top - paddedHeight).toInt().clamp(0, rgbImage.height - 1);
+    final w = (rect.width * (1 + padding * 2)).toInt().clamp(1, rgbImage.width - x);
+    final h = (rect.height * (1 + padding * 2)).toInt().clamp(1, rgbImage.height - y);
 
     return img.copyCrop(
       rgbImage,

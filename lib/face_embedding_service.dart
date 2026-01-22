@@ -30,7 +30,7 @@ class FaceEmbeddingService {
   // ============================================================
   // MAIN ENTRY — used by CameraScreen
   // ============================================================
-  Future<List<double>> getEmbeddingFromCameraImage(
+  Future<List<double>?> getEmbeddingFromCameraImage(
     CameraImage cameraImage,
     Face face,
   ) async {
@@ -56,8 +56,14 @@ class FaceEmbeddingService {
   // ============================================================
   // CORE EMBEDDING FUNCTION
   // ============================================================
-  List<double> getEmbedding(img.Image faceImage) {
+  List<double>? getEmbedding(img.Image faceImage) {
     try {
+      // Validate input
+      if (faceImage.width < 50 || faceImage.height < 50) {
+        print('❌ Face image too small: ${faceImage.width}x${faceImage.height}');
+        return null;
+      }
+
       final img.Image resized =
           img.copyResize(faceImage, width: inputSize, height: inputSize);
 
@@ -83,10 +89,19 @@ class FaceEmbeddingService {
         output,
       );
 
-      return List<double>.from(output[0]);
+      final embedding = List<double>.from(output[0]);
+      
+      // Validate embedding is not all zeros
+      final sum = embedding.reduce((a, b) => a + b);
+      if (sum.abs() < 0.1) {
+        print('❌ Invalid embedding (all zeros)');
+        return null;
+      }
+
+      return embedding;
     } catch (e) {
       print('❌ Error generating embedding: $e');
-      rethrow;
+      return null;
     }
   }
 

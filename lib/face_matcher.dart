@@ -17,25 +17,34 @@ class FaceMatcher {
   }
 
   /// Returns best match or null
+  /// Updated to handle multiple embeddings per person
   static String? findBestMatch({
     required List<double> embedding,
-    required Map<String, List<double>> database,
+    required Map<String, List<List<double>>> database,
     double threshold = 0.5,
   }) {
     String? bestUser;
     double bestScore = -1;
 
-    database.forEach((name, storedEmbedding) {
-      final score = cosineSimilarity(embedding, storedEmbedding);
-      if (score > bestScore) {
-        bestScore = score;
-        bestUser = name;
+    // Compare against all stored embeddings
+    database.forEach((name, storedEmbeddings) {
+      // Find best match for this person across all their embeddings
+      for (final storedEmbedding in storedEmbeddings) {
+        final score = cosineSimilarity(embedding, storedEmbedding);
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestUser = name;
+        }
       }
     });
 
     if (bestScore >= threshold) {
+      print('✅ Best match: $bestUser (score: ${bestScore.toStringAsFixed(2)})');
       return bestUser;
     }
+    
+    print('⚠️ No match found (best: ${bestScore.toStringAsFixed(2)} < $threshold)');
     return null;
   }
 }
