@@ -2,7 +2,7 @@
 
 A real-time face recognition mobile application built with Flutter that detects, recognizes, and stores face data using TensorFlow Lite and Google ML Kit.
 
-## 📱 Features
+##  Features
 
 - **Real-time Face Detection** - Detects faces using Google ML Kit with high accuracy
 - **Face Recognition** - Recognizes registered faces using TensorFlow Lite embeddings
@@ -14,7 +14,7 @@ A real-time face recognition mobile application built with Flutter that detects,
 - **Smooth Performance** - Frame skipping optimization for buttery smooth UX
 - **Low Latency** - Processes every 3rd frame for balance between speed and accuracy
 
-## 🎯 Technical Stack
+##  Technical Stack
 
 - **Framework**: Flutter 3.10.7+
 - **Language**: Dart
@@ -24,7 +24,7 @@ A real-time face recognition mobile application built with Flutter that detects,
 - **Storage**: SharedPreferences for persistent data
 - **Image Processing**: Dart `image` package
 
-## 🚀 Installation
+##  Installation
 
 1. **Clone the repository**
    ```bash
@@ -42,7 +42,7 @@ A real-time face recognition mobile application built with Flutter that detects,
    flutter run
    ```
 
-## 📖 Usage
+##  Usage
 
 ### Register a Face
 1. Position your face in front of the camera until you see a green box
@@ -63,7 +63,7 @@ A real-time face recognition mobile application built with Flutter that detects,
 - Recognized faces will display their names above the green bounding boxes
 - Unknown faces will show "Unknown"
 
-## 🏗️ Project Structure
+##  Project Structure
 
 ```
 lib/
@@ -80,7 +80,7 @@ assets/
     └── face_embedding.tflite    # TensorFlow Lite embedding model
 ```
 
-## 🔧 Configuration
+##  Configuration
 
 ### Similarity Threshold
 Adjust the face matching threshold in `camera_screen.dart` (line ~125):
@@ -94,7 +94,7 @@ Modify frame skip rate in `camera_screen.dart`:
 static const int _frameSkip = 2; // Process every 3rd frame (0-based)
 ```
 
-## 🎨 UI Components
+##  UI Components
 
 | Component | Location | Function |
 |-----------|----------|----------|
@@ -104,21 +104,21 @@ static const int _frameSkip = 2; // Process every 3rd frame (0-based)
 | Flip Camera Button | Top-right | Toggles front/back camera |
 | Delete Button | Top-left | Clears all registered faces |
 
-## ⚡ Performance Optimizations
+##  Performance Optimizations
 
 - **Frame Skipping**: Processes every 3rd frame to reduce CPU load by ~67%
 - **YUV420 to RGB Conversion**: Efficient image format conversion
 - **Lazy Embedding**: Only generates embeddings for detected faces
 - **Batch Processing**: Handles multiple faces in parallel
 
-## 🔐 Security & Privacy
+##  Security & Privacy
 
 - All face embeddings are stored locally on device
 - No data is sent to external servers
 - SharedPreferences handles encrypted storage on Android/iOS
 - Users have full control to delete data anytime
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
@@ -127,7 +127,7 @@ static const int _frameSkip = 2; // Process every 3rd frame (0-based)
 | Wrong faces being recognized | Increase similarity threshold to 0.8 or higher |
 | Camera permission denied | Grant camera permissions in device settings |
 
-## 📊 Model Information
+##  Model Information
 
 - **Model**: `face_embedding.tflite`
 - **Input**: 160×160×3 RGB image
